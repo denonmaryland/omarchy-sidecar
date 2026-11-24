@@ -371,13 +371,13 @@ Item {
   function saveState() { stateFile.setText(JSON.stringify({ version: 1, pinned: root.pinned, width: root.savedWidth, names: root.wsNames, frame: root.frameOn }, null, 2) + "\n") }
 
   // ---- the frame: the sidebar's page carried round the other three edges ----
-  // A thin band in the page colour along the top, right and bottom, with
-  // rounded inside corners, so the rail or sidebar and the frame read as one
-  // shell and the windows sit in a rounded opening. It reserves nothing: it
-  // lies inside Hyprland's outer gap, and its corners follow the windows'
-  // rounding, so it never covers a window.
+  // The page colour fills Hyprland's outer gap on all four sides (beside the
+  // rail or sidebar too), with an opening whose corners are the windows' own
+  // rounding. So the rail or sidebar and the frame read as one shell, and a
+  // window's edge is the only outline: no strip of wallpaper between them. It
+  // reserves nothing and lies wholly inside the gap, so it never covers a
+  // window.
   property bool frameOn: true
-  readonly property int frameBand: 6
   property int hyprGapsOut: 16
   property int hyprRounding: 20
   function readHyprLook(text) {
@@ -1872,15 +1872,18 @@ Item {
     WlrLayershell.namespace: "sidecar-frame"
     WlrLayershell.layer: WlrLayer.Top
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-    // Where the opening starts on the left: the rail, or the pinned sidebar.
-    property real leftEdge: root.pinned ? root.wideWidth : root.railWidth
-    Behavior on leftEdge { NumberAnimation { duration: Style.duration(200); easing.type: Easing.OutCubic } }
-    readonly property real band: Math.min(root.frameBand, root.hyprGapsOut)
-    // Concentric with the windows' corners, which sit hyprGapsOut in.
-    readonly property real r: root.hyprRounding + Math.max(0, root.hyprGapsOut - band)
-    // The floating sidebar card covers the opening's left corners; under it
-    // they stay square, so the frame never draws over the card.
+    // Where the rail or the pinned sidebar ends; the opening starts one band in.
+    property real sideEdge: root.pinned ? root.wideWidth : root.railWidth
+    Behavior on sideEdge { NumberAnimation { duration: Style.duration(200); easing.type: Easing.OutCubic } }
+    readonly property real band: root.hyprGapsOut
+    // The opening's edge is the windows' edge, so its corners are theirs.
+    readonly property real r: root.hyprRounding
+    // While the sidebar floats as a card over the windows, the frame stops at
+    // the card's right edge and the opening's left corners there stay square,
+    // so it never draws over the card.
     readonly property bool cardOut: root.floatOpen && !root.pinned && root.floatScreen === String(screen ? screen.name : "")
+    readonly property real outerLeft: cardOut ? root.wideWidth + root.cardInset : sideEdge
+    readonly property real leftEdge: cardOut ? outerLeft : sideEdge + band
     readonly property real rl: cardOut ? 0 : r
     Shape {
       anchors.fill: parent
@@ -1891,11 +1894,11 @@ Item {
         fillRule: ShapePath.OddEvenFill
         // The screen right of the rail or sidebar (the frame may sit above
         // it, so it never paints there)…
-        startX: frameWin.leftEdge; startY: 0
+        startX: frameWin.outerLeft; startY: 0
         PathLine { x: frameWin.width; y: 0 }
         PathLine { x: frameWin.width; y: frameWin.height }
-        PathLine { x: frameWin.leftEdge; y: frameWin.height }
-        PathLine { x: frameWin.leftEdge; y: 0 }
+        PathLine { x: frameWin.outerLeft; y: frameWin.height }
+        PathLine { x: frameWin.outerLeft; y: 0 }
         // …less the rounded opening.
         PathMove { x: frameWin.leftEdge + frameWin.rl; y: frameWin.band }
         PathLine { x: frameWin.width - frameWin.band - frameWin.r; y: frameWin.band }
