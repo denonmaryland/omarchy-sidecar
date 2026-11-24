@@ -175,6 +175,9 @@ Item {
   function mix(a, b, t) { return Qt.rgba(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, 1) }
   readonly property color cFg: sg.foreground
   readonly property color cMuted: sg.mutedFg
+  // Status colours, the only colour the sidebar uses: running low, nearly out.
+  readonly property color cWarn: lightTheme ? "#d87400" : "#f79c40"
+  readonly property color cLow: lightTheme ? "#e7000b" : "#ff6467"
   readonly property color cLabel: mix(sg.foreground, sg.mutedFg, 0.44)
   readonly property color cTitle: mix(sg.foreground, sg.mutedFg, 0.71)
   readonly property color cDim: Qt.rgba(sg.mutedFg.r, sg.mutedFg.g, sg.mutedFg.b, 0.8)
@@ -397,6 +400,51 @@ Item {
     running: true
     stdout: StdioCollector { onStreamFinished: root.readHyprLook(text) }
   }
+  // ---- AI usage: how much is left on each agent subscription ----------------
+  // Read from the records Omarchy's own Agents panel draws
+  // (~/.local/state/omarchy/agents/usage/*.json, written by
+  // omarchy-agent-usage-update). An agent counts once it has limit windows;
+  // what is left is decided by its fullest window, since that is what stops
+  // the next prompt. Read every two minutes, never drawn more often.
+  property var agentUsage: []
+  readonly property var agentOrder: ["claude", "codex", "grok"]
+  function readUsage(text) {
+    var out = []
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === "") continue
+      try {
+        var r = JSON.parse(lines[i])
+        if (!r || !r.limits || r.limits.length === 0) continue
+        var worst = null
+        for (var k = 0; k < r.limits.length; k++) {
+          var lim = r.limits[k]
+          var used = Number(lim.percent)
+          if (!isFinite(used)) continue
+          if (!worst || used > worst.used) worst = { used: used, label: BarModel.cleanText(lim.label, 40), resetsAt: String(lim.resetsAt || "") }
+        }
+        if (!worst) continue
+        var name = BarModel.cleanText(r.name || r.id, 24).replace(/ Code$/, "")
+        out.push({ id: String(r.id || ""), name: name, left: Math.max(0, Math.min(1, 1 - worst.used)),
+                   window: worst.label, resetsAt: worst.resetsAt, stale: r.limitsStale === true })
+      } catch (e) {}
+    }
+    out.sort(function(a, b) {
+      var ia = root.agentOrder.indexOf(a.id), ib = root.agentOrder.indexOf(b.id)
+      if (ia === -1) ia = 99
+      if (ib === -1) ib = 99
+      return ia !== ib ? ia - ib : a.name.localeCompare(b.name)
+    })
+    if (JSON.stringify(out) !== JSON.stringify(agentUsage)) agentUsage = out
+  }
+  Process {
+    id: usageProbe
+    command: ["sh", "-c", "for f in \"${XDG_STATE_HOME:-$HOME/.local/state}\"/omarchy/agents/usage/*.json; do [ -f \"$f\" ] && jq -c '{id, name, limits, limitsStale}' \"$f\" 2>/dev/null; done"]
+    running: true
+    stdout: StdioCollector { onStreamFinished: root.readUsage(text) }
+  }
+  Timer { interval: 120000; running: true; repeat: true; onTriggered: usageProbe.running = true }
+
   function setFrame(on) { on = !!on; if (frameOn === on) return; frameOn = on; saveState() }
 
   ShellIpc {
@@ -2389,18 +2437,68 @@ Item {
         // The workspace or page block now shown; the pill sits on its row.
         property Item armedBlock: null
 
-        // Header: search and the launcher. No machine name: the sidebar
-        // carries no title of its own.
+        // Header: what is left on each AI subscription, and the launcher. No
+        // machine name: the sidebar carries no title of its own.
         Item {
           id: header
           width: parent.width
           height: 32
-          SideButton {
-            anchors.right: plusButton.left
-            anchors.rightMargin: 8
+          // What is left on each AI subscription; a click opens the Agents panel.
+          Row {
+            id: usageRow
+            x: 6
             anchors.verticalCenter: parent.verticalCenter
-            icon: "search"
-            onClicked: root.openSearch()
+            readonly property real room: Math.max(0, plusButton.x - 14 - x)
+            readonly property var shown: root.agentUsage.slice(0, 3)
+            spacing: 10
+            Repeater {
+              model: usageRow.shown
+              Item {
+                id: usageItem
+                required property var modelData
+                readonly property int pct: Math.round(modelData.left * 100)
+                width: usageRow.shown.length > 0 ? Math.floor((usageRow.room - usageRow.spacing * (usageRow.shown.length - 1)) / usageRow.shown.length) : 0
+                height: 28
+                Label {
+                  id: usageName
+                  y: 2
+                  width: parent.width - usagePct.implicitWidth - 4
+                  text: usageItem.modelData.name
+                  color: root.cMuted
+                  font.pixelSize: 11
+                  font.weight: Font.Medium
+                }
+                Label {
+                  id: usagePct
+                  anchors.right: parent.right
+                  y: 2
+                  text: String(usageItem.pct)
+                  elide: Text.ElideNone
+                  color: usageItem.pct <= 5 ? root.cLow : usageItem.pct <= 15 ? root.cWarn : root.cFg
+                  font.family: root.mono
+                  font.pixelSize: 11
+                }
+                Rectangle {
+                  y: 20
+                  width: parent.width
+                  height: 3
+                  radius: 1.5
+                  color: root.sg.well
+                  Rectangle {
+                    width: Math.max(height, parent.width * usageItem.modelData.left)
+                    height: parent.height
+                    radius: parent.radius
+                    opacity: usageItem.modelData.stale ? 0.5 : 1
+                    color: usageItem.pct <= 5 ? root.cLow : usageItem.pct <= 15 ? root.cWarn : root.cFg
+                  }
+                }
+                MouseArea {
+                  anchors.fill: parent
+                  cursorShape: Qt.PointingHandCursor
+                  onClicked: root.togglePanel("agents")
+                }
+              }
+            }
           }
           SideButton {
             id: plusButton
