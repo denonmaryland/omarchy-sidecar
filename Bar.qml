@@ -106,11 +106,18 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.themeMode = BarModel.themeMode(text())
-    onLoadFailed: root.themeMode = ""
+    onLoaded: {
+      var toml = text()
+      root.themeMode = BarModel.themeMode(toml)
+      root.themeBackground = Tokens.tomlColor(toml, "background")
+      root.themePage = Tokens.tomlColor(toml, "dark_background")
+    }
+    onLoadFailed: { root.themeMode = ""; root.themeBackground = ""; root.themePage = "" }
   }
+  property string themeBackground: ""
+  property string themePage: ""
   readonly property bool lightTheme: themeMode !== "" ? themeMode === "light" : Commons.Color.background.hslLightness > 0.6
-  readonly property var tokens: lightTheme ? Tokens.light : Tokens.dark
+  readonly property var tokens: Tokens.tinted(lightTheme ? Tokens.light : Tokens.dark, lightTheme, themeBackground, themePage)
   // Geist when it is installed, else the shell's own face.
   readonly property var installedFamilies: Qt.fontFamilies()
   readonly property bool hasGeist: installedFamilies.indexOf("Geist") !== -1
