@@ -360,14 +360,53 @@ Item {
           root.savedWidth = next.width === undefined || next.width === null ? root.defaultWidth : root.clampWidth(next.width)
           var names = BarModel.cleanNames(next.names)
           if (JSON.stringify(names) !== JSON.stringify(root.wsNames)) root.wsNames = names
+          root.frameOn = next.frame !== false
         }
       } catch (e) {}
     }
   }
-  function saveState() { stateFile.setText(JSON.stringify({ version: 1, pinned: root.pinned, width: root.savedWidth, names: root.wsNames }, null, 2) + "\n") }
+  function saveState() { stateFile.setText(JSON.stringify({ version: 1, pinned: root.pinned, width: root.savedWidth, names: root.wsNames, frame: root.frameOn }, null, 2) + "\n") }
+
+  // ---- the frame: the sidebar's page carried round the other three edges ----
+  // A thin band in the page colour along the top, right and bottom, with
+  // rounded inside corners, so the rail or sidebar and the frame read as one
+  // shell and the windows sit in a rounded opening. It reserves nothing: it
+  // lies inside Hyprland's outer gap, and its corners follow the windows'
+  // rounding, so it never covers a window.
+  property bool frameOn: true
+  readonly property int frameBand: 6
+  property int hyprGapsOut: 16
+  property int hyprRounding: 20
+  function readHyprLook(text) {
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      try {
+        var o = JSON.parse(lines[i])
+        if (o.option === "general:gaps_out") {
+          var parts = String(o.css || "").trim().split(/\s+/).map(function(v) { return parseInt(v, 10) })
+          if (parts.length > 0 && !isNaN(parts[0])) root.hyprGapsOut = Math.max(0, Math.min(64, parts[0]))
+        } else if (o.option === "decoration:rounding" && o.int !== undefined) {
+          root.hyprRounding = Math.max(0, Math.min(64, Number(o.int)))
+        }
+      } catch (e) {}
+    }
+  }
+  Process {
+    id: hyprLook
+    command: ["sh", "-c", "hyprctl -j getoption general:gaps_out | tr -d '\\n'; echo; hyprctl -j getoption decoration:rounding | tr -d '\\n'; echo"]
+    running: true
+    stdout: StdioCollector { onStreamFinished: root.readHyprLook(text) }
+  }
+  function setFrame(on) { on = !!on; if (frameOn === on) return; frameOn = on; saveState() }
 
   ShellIpc {
     target: "sidecar"
+    // The frame round the other three edges: on, off, or toggle.
+    function frame(mode: string): string {
+      var m = String(mode)
+      root.setFrame(m === "on" ? true : m === "off" ? false : !root.frameOn)
+      return root.frameOn ? "on" : "off"
+    }
     function toggle(): string { root.toggle(); return root.stateName() }
     function expand(): string { root.expand("", true); return root.stateName() }
     function collapse(): string { root.setPinned(false); root.collapse(); return root.stateName() }
@@ -793,6 +832,7 @@ Item {
     target: Hyprland
     function onRawEvent(event) {
       var name = event ? String(event.name) : ""
+      if (name === "configreloaded") hyprLook.running = true
       if (root.perMonitor && (name === "workspacev2" || name === "moveworkspacev2" || name === "changeworkspaceid")) {
         Hyprland.refreshMonitors()
         Hyprland.refreshWorkspaces()
@@ -1768,6 +1808,58 @@ Item {
     model: Quickshell.screens
     delegate: Component {
       SidebarWindow {}
+    }
+  }
+  Variants {
+    model: Quickshell.screens
+    delegate: Component {
+      FrameWindow {}
+    }
+  }
+
+  component FrameWindow: PanelWindow {
+    id: frameWin
+    required property var modelData
+    screen: modelData
+    visible: root.frameOn && !root.barParked
+    color: "transparent"
+    surfaceFormat.opaque: false
+    anchors { top: true; bottom: true; left: true; right: true }
+    exclusionMode: ExclusionMode.Ignore
+    mask: Region {}
+    WlrLayershell.namespace: "sidecar-frame"
+    WlrLayershell.layer: WlrLayer.Top
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    // Where the opening starts on the left: the rail, or the pinned sidebar.
+    property real leftEdge: root.pinned ? root.wideWidth : root.railWidth
+    Behavior on leftEdge { NumberAnimation { duration: Style.duration(200); easing.type: Easing.OutCubic } }
+    readonly property real band: Math.min(root.frameBand, root.hyprGapsOut)
+    // Concentric with the windows' corners, which sit hyprGapsOut in.
+    readonly property real r: root.hyprRounding + Math.max(0, root.hyprGapsOut - band)
+    Shape {
+      anchors.fill: parent
+      preferredRendererType: Shape.CurveRenderer
+      ShapePath {
+        fillColor: root.sg.page
+        strokeWidth: -1
+        fillRule: ShapePath.OddEvenFill
+        // The whole screen…
+        startX: 0; startY: 0
+        PathLine { x: frameWin.width; y: 0 }
+        PathLine { x: frameWin.width; y: frameWin.height }
+        PathLine { x: 0; y: frameWin.height }
+        PathLine { x: 0; y: 0 }
+        // …less the rounded opening.
+        PathMove { x: frameWin.leftEdge + frameWin.r; y: frameWin.band }
+        PathLine { x: frameWin.width - frameWin.band - frameWin.r; y: frameWin.band }
+        PathArc { x: frameWin.width - frameWin.band; y: frameWin.band + frameWin.r; radiusX: frameWin.r; radiusY: frameWin.r }
+        PathLine { x: frameWin.width - frameWin.band; y: frameWin.height - frameWin.band - frameWin.r }
+        PathArc { x: frameWin.width - frameWin.band - frameWin.r; y: frameWin.height - frameWin.band; radiusX: frameWin.r; radiusY: frameWin.r }
+        PathLine { x: frameWin.leftEdge + frameWin.r; y: frameWin.height - frameWin.band }
+        PathArc { x: frameWin.leftEdge; y: frameWin.height - frameWin.band - frameWin.r; radiusX: frameWin.r; radiusY: frameWin.r }
+        PathLine { x: frameWin.leftEdge; y: frameWin.band + frameWin.r }
+        PathArc { x: frameWin.leftEdge + frameWin.r; y: frameWin.band; radiusX: frameWin.r; radiusY: frameWin.r }
+      }
     }
   }
 
