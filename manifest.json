@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.denonmaryland.sidecar",
+  "name": "Sidecar",
+  "version": "0.1.0",
+  "author": "denonmaryland",
+  "license": "MIT",
+  "description": "A 56px rail on the left edge that opens into a sidebar of workspaces, their windows, pinned app pages and system rows, styled after Solid Glass",
+  "kinds": [
+    "bar"
+  ],
+  "entryPoints": {
+    "bar": "Bar.qml"
+  }
+}

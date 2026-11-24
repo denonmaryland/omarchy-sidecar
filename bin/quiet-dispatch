@@ -1,0 +1,20 @@
+#!/bin/bash
+# Run one Hyprland dispatcher without the pointer being carried to the window
+# it focuses. Sidecar uses this: you clicked a row, so the pointer should
+# stay on the row. Keyboard focus moves elsewhere keep their usual warp.
+#   quiet-dispatch 'hl.dsp.focus({ window = "address:0x…" })'
+set -u
+expr=${1:?dispatcher expression}
+
+opt() { hyprctl getoption "$1" | awk 'NR==1 { print $2 }'; }
+warps=$(opt cursor:no_warps)
+onws=$(opt cursor:warp_on_change_workspace)
+[[ $warps == true || $warps == false ]] || warps=false
+[[ $onws =~ ^[0-9]+$ ]] || onws=0
+
+hyprctl eval "hl.config({ cursor = { no_warps = true, warp_on_change_workspace = 0 } })" >/dev/null
+hyprctl dispatch "$expr" >/dev/null
+# The focus change (and any workspace slide it starts) has been issued; give
+# the compositor a moment before the usual behaviour comes back.
+sleep 0.15
+hyprctl eval "hl.config({ cursor = { no_warps = $warps, warp_on_change_workspace = $onws } })" >/dev/null

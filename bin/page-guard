@@ -1,0 +1,12 @@
+#!/bin/bash
+# A window of another app opened on a pinned app's page: send it where it
+# belongs. Floating windows (dialogs, pickers) stay with the app that asked.
+#   page-guard <address without 0x> <workspace: number or name:Page>
+set -u
+addr=${1:?address}; dest=${2:?workspace}
+[[ $addr =~ ^[0-9a-fA-F]+$ ]] || exit 1
+[[ $dest =~ ^([0-9]+|name:[A-Za-z]+)$ ]] || exit 1
+sleep 0.15
+floating=$(hyprctl clients -j | jq -r --arg a "0x$addr" '.[] | select(.address == $a) | .floating')
+[[ $floating == false ]] || exit 0
+exec "$(dirname "$0")/quiet-dispatch" "hl.dsp.window.move({ workspace = \"$dest\", follow = true, window = \"address:0x$addr\" })"
