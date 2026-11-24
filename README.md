@@ -4,7 +4,8 @@ A bar for [Omarchy](https://omarchy.org): a 56px rail on the left edge of the sc
 into a sidebar of your workspaces, their windows, pinned app pages and system rows. It is styled
 after DeepLethe's [Solid Glass](https://github.com/deeplethe/solid-glass): neutral grey panes, a
 hairline and a line of light at each pane's edge, one clear state for hovered and chosen, and one
-solid ink for what asks to be pressed. Status dots are the only colour.
+solid ink for what asks to be pressed. Status dots and a running-low usage bar are the only
+colour.
 
 ![Sidecar pinned beside the windows](screenshots/pinned.png)
 
@@ -38,10 +39,20 @@ Needs Omarchy 4.5 or later (Hyprland with the Lua config).
   rail or the sidebar. Sidecar keeps the panel widgets from your `bar.layout` loaded but never
   draws them; if your layout has none of a kind, it loads the stock `omarchy.*` one.
 - **Inbox** puts the last few notifications back on screen (the stock notification history).
-- **Footer:** time, date, pin and power (Omarchy's system menu). The header shows the hostname
-  (click for the Omarchy menu), search and `+` (the app grid).
-- Follows your Omarchy theme's light or dark mode and the language set under Setup > Language.
-  Uses Geist when it is installed, else the shell's font.
+- **Footer:** time, date, pin and power (Omarchy's system menu).
+- **Header:** how much is left on each AI subscription (Claude, Codex, Grok, up to three), as a
+  percentage and a thin bar, with `+` (the app grid) beside it. The numbers come from the
+  records Omarchy's own Agents panel keeps (`~/.local/state/omarchy/agents/usage/`), read every
+  two minutes; each agent shows its fullest limit window, since that is the one that stops you.
+  Click it for the Agents panel. With no records the strip is simply empty.
+- **Frame:** the sidebar's page colour carries on round the top, right and bottom, filling
+  Hyprland's outer gap, so the rail or sidebar and the frame read as one shell and each window's
+  own edge is the only outline. It reserves no space and never covers a window; its corners
+  follow your window rounding. Turn it off with `omarchy-shell sidecar frame off`.
+- **Theme:** follows your Omarchy theme's light or dark mode, and its tone: the grey panes lean
+  a little toward the theme's hue (never more than a tint), and a dark theme with a lifted page
+  lifts the sidebar's page with it. Follows the language set under Setup > Language. Uses Geist
+  when it is installed, else the shell's font.
 
 Sidecar does not draw the tray, indicators, keyboard layout, update notice, weather or clock
 card; their widgets in `bar.layout` are simply not loaded while Sidecar is the bar.
@@ -65,7 +76,7 @@ omarchy restart shell
 omarchy plugin remove io.github.denonmaryland.sidecar    # remove the files
 ```
 
-Sidecar keeps its pin, width and workspace names in `~/.config/omarchy/sidecar.json`; delete it
+Sidecar keeps its pin, width, frame and workspace names in `~/.config/omarchy/sidecar.json`; delete it
 too if you want nothing left behind. It never writes to your Hyprland config.
 
 ## IPC
@@ -82,6 +93,7 @@ omarchy-shell sidecar page terminal       # terminal | browser | files
 omarchy-shell sidecar another terminal    # one more window on that page
 omarchy-shell sidecar sound               # [{ app, workspace, address, muted }]
 omarchy-shell sidecar muteWindow 0x5f...  # mute or unmute one window's streams
+omarchy-shell sidecar frame off           # on | off | toggle; prints the new state
 ```
 
 `expand` opens the sidebar until Escape, another call, or the pointer has come in and left.
@@ -89,7 +101,8 @@ Bind `omarchy-shell sidecar toggle` to a key in `~/.config/hypr/bindings.lua` if
 
 ## Optional Hyprland snippet
 
-Sidecar works with Omarchy's default gaps. The design was drawn with one 8px gap between windows,
+Sidecar works with Omarchy's default gaps; the frame is as thick as your outer gap. The design was
+drawn with one 8px gap between windows,
 the rail and the screen edges, and the floating card frosted. To get that, add this to a file of
 your own under `~/.config/hypr/` (for example `looknfeel.lua`), then check `hyprctl configerrors`:
 
