@@ -6,7 +6,11 @@ after DeepLethe's [Solid Glass](https://github.com/deeplethe/solid-glass): neutr
 hairline and a line of light at each pane's edge, one clear state for hovered and chosen, and one
 solid ink for what asks to be pressed. Status dots are the only colour.
 
-> Screenshots: _to come_ (rail, floating sidebar, pinned sidebar, a panel open beside it).
+![Sidecar pinned beside the windows](screenshots/pinned.png)
+
+| Floating over the windows | A panel beside it | Folded to the rail |
+|---|---|---|
+| ![Floating](screenshots/floating.png) | ![Sound panel](screenshots/panel.png) | ![Rail](screenshots/rail.png) |
 
 Needs Omarchy 4.5 or later (Hyprland with the Lua config).
 
