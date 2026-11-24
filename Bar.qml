@@ -521,12 +521,6 @@ Item {
   readonly property string ampmText: timeParts.length > 1 ? timeParts[timeParts.length - 1] : ""
   readonly property string dateText: locale.toString(clock.date, "ddd, MMM d")
 
-  property string hostName: ""
-  FileView {
-    path: "/etc/hostname"
-    printErrors: false
-    onLoaded: root.hostName = String(text()).trim().slice(0, 40)
-  }
 
   // Sound: the default output.
   readonly property var sink: Pipewire.defaultAudioSink
@@ -2395,35 +2389,12 @@ Item {
         // The workspace or page block now shown; the pill sits on its row.
         property Item armedBlock: null
 
-        // Header: the machine, search, and the launcher.
+        // Header: search and the launcher. No machine name: the sidebar
+        // carries no title of its own.
         Item {
           id: header
           width: parent.width
           height: 32
-          MouseArea {
-            x: 0
-            width: hostLabel.x + hostLabel.width + 24
-            height: parent.height
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.openMenu("root")
-          }
-          Label {
-            id: hostLabel
-            x: 6
-            anchors.verticalCenter: parent.verticalCenter
-            width: Math.min(implicitWidth, parent.width - 6 - 20 - 8 - 28 - 8 - 28 - 4)
-            text: root.hostName
-            font.pixelSize: 14
-            font.weight: Font.DemiBold
-            font.letterSpacing: -0.14
-          }
-          Glyph {
-            x: hostLabel.x + hostLabel.width + 8
-            anchors.verticalCenter: parent.verticalCenter
-            name: "chevron"
-            size: 12
-            stroke: 2.2
-          }
           SideButton {
             anchors.right: plusButton.left
             anchors.rightMargin: 8
