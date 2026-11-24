@@ -1878,6 +1878,10 @@ Item {
     readonly property real band: Math.min(root.frameBand, root.hyprGapsOut)
     // Concentric with the windows' corners, which sit hyprGapsOut in.
     readonly property real r: root.hyprRounding + Math.max(0, root.hyprGapsOut - band)
+    // The floating sidebar card covers the opening's left corners; under it
+    // they stay square, so the frame never draws over the card.
+    readonly property bool cardOut: root.floatOpen && !root.pinned && root.floatScreen === String(screen ? screen.name : "")
+    readonly property real rl: cardOut ? 0 : r
     Shape {
       anchors.fill: parent
       preferredRendererType: Shape.CurveRenderer
@@ -1885,22 +1889,23 @@ Item {
         fillColor: root.sg.page
         strokeWidth: -1
         fillRule: ShapePath.OddEvenFill
-        // The whole screen…
-        startX: 0; startY: 0
+        // The screen right of the rail or sidebar (the frame may sit above
+        // it, so it never paints there)…
+        startX: frameWin.leftEdge; startY: 0
         PathLine { x: frameWin.width; y: 0 }
         PathLine { x: frameWin.width; y: frameWin.height }
-        PathLine { x: 0; y: frameWin.height }
-        PathLine { x: 0; y: 0 }
+        PathLine { x: frameWin.leftEdge; y: frameWin.height }
+        PathLine { x: frameWin.leftEdge; y: 0 }
         // …less the rounded opening.
-        PathMove { x: frameWin.leftEdge + frameWin.r; y: frameWin.band }
+        PathMove { x: frameWin.leftEdge + frameWin.rl; y: frameWin.band }
         PathLine { x: frameWin.width - frameWin.band - frameWin.r; y: frameWin.band }
         PathArc { x: frameWin.width - frameWin.band; y: frameWin.band + frameWin.r; radiusX: frameWin.r; radiusY: frameWin.r }
         PathLine { x: frameWin.width - frameWin.band; y: frameWin.height - frameWin.band - frameWin.r }
         PathArc { x: frameWin.width - frameWin.band - frameWin.r; y: frameWin.height - frameWin.band; radiusX: frameWin.r; radiusY: frameWin.r }
-        PathLine { x: frameWin.leftEdge + frameWin.r; y: frameWin.height - frameWin.band }
-        PathArc { x: frameWin.leftEdge; y: frameWin.height - frameWin.band - frameWin.r; radiusX: frameWin.r; radiusY: frameWin.r }
-        PathLine { x: frameWin.leftEdge; y: frameWin.band + frameWin.r }
-        PathArc { x: frameWin.leftEdge + frameWin.r; y: frameWin.band; radiusX: frameWin.r; radiusY: frameWin.r }
+        PathLine { x: frameWin.leftEdge + frameWin.rl; y: frameWin.height - frameWin.band }
+        PathArc { x: frameWin.leftEdge; y: frameWin.height - frameWin.band - frameWin.rl; radiusX: frameWin.rl; radiusY: frameWin.rl }
+        PathLine { x: frameWin.leftEdge; y: frameWin.band + frameWin.rl }
+        PathArc { x: frameWin.leftEdge + frameWin.rl; y: frameWin.band; radiusX: frameWin.rl; radiusY: frameWin.rl }
       }
     }
   }
@@ -2052,10 +2057,16 @@ Item {
       focus: true
       Keys.onEscapePressed: root.collapse()
 
+      // The layer is wider than what shows (room for the card and its
+      // shadow). The compositor can report the pointer anywhere over it, so
+      // only the part that shows counts as inside: a pointer resting beside a
+      // keyboard-opened card must not take it for a visit and close it.
       HoverHandler {
-        onHoveredChanged: root.pointerChanged(win.screenName, hovered)
-        onPointChanged: if (hovered) root.pointerMoved(point.position)
-        Component.onDestruction: if (hovered) root.pointerChanged(win.screenName, false)
+        id: hover
+        readonly property bool overSidebar: hovered && point.position.x <= inputArea.width
+        onOverSidebarChanged: root.pointerChanged(win.screenName, overSidebar)
+        onPointChanged: if (overSidebar) root.pointerMoved(point.position)
+        Component.onDestruction: if (overSidebar) root.pointerChanged(win.screenName, false)
       }
 
       // The page under the rail. In the scrolling layout, columns that have
