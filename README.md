@@ -45,12 +45,12 @@ card; their widgets in `bar.layout` are simply not loaded while Sidecar is the b
 ## Install
 
 ```bash
-omarchy plugin add <git-url-of-this-repo>
+omarchy plugin add https://github.com/denonmaryland/omarchy-sidecar
 omarchy plugin enable io.github.denonmaryland.sidecar   # use it as the bar
 omarchy restart shell
 ```
 
-`omarchy plugin add <url> --enable` does both steps at once. A bar switch takes effect after
+`omarchy plugin add https://github.com/denonmaryland/omarchy-sidecar --enable` does both steps at once. A bar switch takes effect after
 `omarchy restart shell`.
 
 ## Back to the stock bar, and uninstall
